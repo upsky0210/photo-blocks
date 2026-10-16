@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>照片轉方塊</title>
+<meta name="description" content="把照片變成方塊風格的像素馬賽克、拼豆施工圖和可以 360° 旋轉的 3D 方塊作品。照片只在你的裝置上處理，不會上傳。">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4' shape-rendering='crispEdges'%3E%3Crect width='2' height='2' fill='%235d9b3a'/%3E%3Crect x='2' width='2' height='2' fill='%23f5d33a'/%3E%3Crect y='2' width='2' height='2' fill='%233f6fd8'/%3E%3Crect x='2' y='2' width='2' height='2' fill='%23c8312a'/%3E%3C/svg%3E">
+<style>
+  @font-face { font-family: "Cubic 11"; src: url("fonts/Cubic_11.woff2") format("woff2"); font-display: swap; }
+  :root {
+    --ink: #2b2b2b; --paper: #fbf6ea; --bg: #e8dfc8; --muted: #6b665c;
+    --grass: #5d9b3a; --gold: #f5d33a; --red: #c0392b; --water: #3f6fd8;
+    --font: "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", system-ui, sans-serif;
+    --pixel: "Cubic 11", var(--font);
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; min-height: 100vh; color: var(--ink); font-family: var(--font); font-size: 16px;
+    background-color: var(--bg);
+    background-image: linear-gradient(rgba(0,0,0,.035) 1px, transparent 1px), linear-gradient(90deg, rgba(0,0,0,.035) 1px, transparent 1px);
+    background-size: 16px 16px; }
+  [hidden] { display: none !important; }
+  button, .btn { font: inherit; font-weight: 700; color: var(--ink); background: #fff; border: 3px solid var(--ink); border-radius: 0;
+    box-shadow: 4px 4px 0 var(--ink); padding: 10px 14px; min-height: 48px; cursor: pointer; text-decoration: none;
+    display: inline-flex; align-items: center; justify-content: center; gap: 6px; touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent; transition: transform .06s, box-shadow .06s; }
+  button:active, .btn:active { transform: translate(3px, 3px); box-shadow: 1px 1px 0 var(--ink); }
+  button.primary { background: var(--grass); color: #fff; }
+  button:disabled { opacity: .5; cursor: default; }
+  button:focus-visible, input:focus-visible { outline: 3px solid var(--water); outline-offset: 2px; }
+
+  /* 標題列 */
+  .top { display: flex; align-items: center; gap: 14px; padding: 14px 18px 4px; flex-wrap: wrap; }
+  .logo { width: 44px; height: 44px; display: grid; grid-template-columns: 1fr 1fr; border: 3px solid var(--ink); box-shadow: 4px 4px 0 var(--ink); flex: none; }
+  .logo i:nth-child(1) { background: var(--grass); } .logo i:nth-child(2) { background: var(--gold); }
+  .logo i:nth-child(3) { background: var(--water); } .logo i:nth-child(4) { background: var(--red); }
+  .top h1 { margin: 0; font-family: var(--pixel); font-weight: 400; font-size: 32px; letter-spacing: 2px; line-height: 1.1; }
+  .top p { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
+
+  /* 紙條卡片 */
+  .card { position: relative; background: var(--paper); border: 3px solid var(--ink); border-left: 10px solid var(--bar, var(--red));
+    box-shadow: 6px 6px 0 rgba(0,0,0,.22); padding: 12px 14px 14px; }
+  .card h2 { margin: 0 0 10px; font-family: var(--pixel); font-weight: 400; font-size: 19px; letter-spacing: 1px; }
+
+  main { padding: 10px 18px 18px; }
+
+  /* 開始畫面 */
+  #start { max-width: 760px; margin: 18px auto; }
+  #drop { --bar: var(--grass); text-align: center; padding: 34px 20px 30px; }
+  #drop::before { content: ''; position: absolute; top: -12px; left: 50%; width: 110px; height: 22px; margin-left: -55px; background: rgba(226,138,138,.85); transform: rotate(-2deg); }
+  #drop.over { background: #eaf6dc; }
+  #drop h2 { font-size: 26px; margin-bottom: 6px; }
+  #drop p { margin: 6px 0; color: var(--muted); }
+  #drop .acts { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; margin: 22px 0 12px; }
+  #drop .acts button { font-size: 20px; padding: 14px 22px; min-width: 170px; }
+  .privacy { display: inline-block; background: #fff6c2; border: 2px dashed #b79b19; padding: 6px 12px; font-size: 14px; color: #5c4c00; margin-top: 8px; }
+  .uses { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 26px; }
+  .uses .card { --bar: var(--water); font-size: 15px; }
+  .uses .card:nth-child(2) { --bar: var(--gold); } .uses .card:nth-child(3) { --bar: var(--grass); }
+  .uses b { font-family: var(--pixel); font-weight: 400; font-size: 18px; display: block; margin-bottom: 4px; }
+
+  /* 工作畫面 */
+  #work { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; align-items: start; }
+  .tabs { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+  .tabs button { font-family: var(--pixel); font-weight: 400; font-size: 18px; }
+  .tabs button.on, .seg button.on { background: var(--gold); }
+  .stage { position: relative; height: clamp(360px, calc(100vh - 230px), 980px); background: #fff; border: 3px solid var(--ink);
+    box-shadow: 6px 6px 0 rgba(0,0,0,.22); overflow: hidden; }
+  .stage > * { position: absolute; inset: 0; }
+  #pane2d { display: grid; place-items: center; padding: 12px;
+    background: repeating-conic-gradient(#f1ede3 0% 25%, #fbf8f1 0% 50%) 0 0 / 20px 20px; }
+  #c2d { display: block; image-rendering: pixelated; box-shadow: 0 0 0 2px var(--ink); }
+  #pane3d { touch-action: none; }
+  #pane3d canvas { display: block; touch-action: none; }
+  #pane3d .hint { position: absolute; left: 10px; bottom: 10px; background: rgba(255,255,255,.85); border: 2px solid var(--ink); padding: 4px 10px; font-size: 13px; pointer-events: none; }
+  #paneStats { overflow: auto; padding: 14px 16px; background: var(--paper); -webkit-overflow-scrolling: touch; }
+  .info { margin-top: 12px; font-size: 15px; display: flex; gap: 6px 16px; flex-wrap: wrap; align-items: baseline; }
+  .info b { font-size: 18px; }
+  .info .note { color: var(--muted); font-size: 13px; }
+
+  /* 控制面板 */
+  .panel { display: flex; flex-direction: column; gap: 18px; }
+  #srcCard { --bar: var(--grass); } #set2d { --bar: var(--water); } #set3d { --bar: var(--gold); }
+  .src { display: flex; gap: 12px; align-items: center; }
+  .src img { width: 92px; height: 70px; object-fit: contain; background: #fff; border: 2px solid var(--ink); flex: none; }
+  .src .col { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+  .src button { min-height: 40px; padding: 6px 10px; font-size: 15px; box-shadow: 3px 3px 0 var(--ink); }
+  .row { margin: 12px 0 0; }
+  .row > label, .row > .lbl { display: flex; justify-content: space-between; align-items: baseline; font-weight: 700; margin-bottom: 6px; }
+  .row output { font-family: var(--pixel); font-size: 18px; color: var(--water); }
+  .seg { display: grid; grid-template-columns: repeat(var(--n, 4), 1fr); gap: 8px; }
+  .seg button { padding: 6px 4px; min-height: 44px; font-size: 15px; box-shadow: 3px 3px 0 var(--ink); }
+  .seg.pal { --n: 2; } .seg.pal button:first-child { grid-column: span 2; }
+  .toggle { width: 100%; justify-content: space-between; min-height: 44px; padding: 6px 12px; box-shadow: 3px 3px 0 var(--ink); }
+  .toggle::after { content: '關'; font-family: var(--pixel); font-weight: 400; background: #ccc; padding: 2px 10px; border: 2px solid var(--ink); }
+  .toggle[aria-pressed="true"]::after { content: '開'; background: var(--grass); color: #fff; }
+  .btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+  .btns button, .btns .btn { font-size: 15px; padding: 8px 6px; min-height: 48px; box-shadow: 3px 3px 0 var(--ink); }
+  .btns .wide { grid-column: span 2; }
+  .small { font-size: 13px; color: var(--muted); margin: 8px 0 0; line-height: 1.5; }
+  #arLink { background: #111; color: #fff; }
+  #arLink img { width: 1px; height: 1px; }
+
+  /* 滑桿 */
+  input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; height: 36px; background: transparent; margin: 0; touch-action: pan-y; }
+  input[type=range]::-webkit-slider-runnable-track { height: 12px; background: #fff; border: 3px solid var(--ink); }
+  input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 30px; height: 30px; margin-top: -12px; background: var(--gold); border: 3px solid var(--ink); border-radius: 0; box-shadow: 2px 2px 0 var(--ink); }
+  input[type=range]::-moz-range-track { height: 6px; background: #fff; border: 3px solid var(--ink); }
+  input[type=range]::-moz-range-thumb { width: 24px; height: 24px; background: var(--gold); border: 3px solid var(--ink); border-radius: 0; }
+
+  /* 色塊統計 */
+  .stats-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  .stats-head h2 { margin: 0; font-family: var(--pixel); font-weight: 400; font-size: 22px; }
+  table.stats { width: 100%; border-collapse: collapse; font-size: 15px; background: #fff; }
+  table.stats th, table.stats td { border: 2px solid var(--ink); padding: 6px 8px; text-align: left; }
+  table.stats th { background: #efe6cf; font-size: 14px; white-space: nowrap; }
+  table.stats td.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  table.stats tfoot td { font-weight: 700; background: #efe6cf; }
+  .sw { display: inline-grid; place-items: center; width: 34px; height: 34px; border: 2px solid var(--ink); font-weight: 700; font-size: 14px; vertical-align: middle; }
+  .bar { height: 12px; background: var(--water); min-width: 2px; border: 1px solid var(--ink); }
+  .bars { width: 32%; }
+
+  footer { text-align: center; font-size: 13px; color: var(--muted); padding: 10px 18px 26px; line-height: 1.8; }
+  footer b { color: var(--ink); }
+
+  #busy { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; background: rgba(20,20,20,.45); }
+  #busy div { background: var(--paper); border: 3px solid var(--ink); box-shadow: 6px 6px 0 rgba(0,0,0,.3); padding: 16px 26px; font-family: var(--pixel); font-size: 20px; }
+  #toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 31; background: var(--ink); color: #fff; padding: 10px 18px; font-weight: 700; max-width: calc(100vw - 32px); }
+
+  /* 平板直放、手機：上下排 */
+  @media (max-width: 960px) {
+    #work { grid-template-columns: 1fr; }
+    .stage { height: min(50vh, 600px); }
+    .panel { display: grid; grid-template-columns: 1fr 1fr; align-items: start; }
+    #srcCard { order: 3; grid-column: span 2; }
+  }
+  @media (max-width: 620px) {
+    .panel { display: flex; }
+    #srcCard { order: 0; }
+    .top h1 { font-size: 26px; }
+    main { padding: 8px 12px 16px; }
+    .stage { height: 56vh; }
+  }
+
+  /* ===== 列印：A4 施工圖 ===== */
+  #print-area { display: none; }
+  @page { size: A4 portrait; margin: 10mm; }
+  @media print {
+    body { background: #fff; }
+    body > *:not(#print-area) { display: none !important; }
+    #print-area { display: block; font-family: var(--font); color: #000; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .pg { break-after: page; page-break-after: always; }
+    .pg:last-child { break-after: auto; page-break-after: auto; }
+    .pg h1 { font-family: var(--pixel); font-weight: 400; font-size: 22pt; margin: 0 0 2mm; }
+    .pg h3 { margin: 0 0 2mm; font-size: 12pt; display: flex; justify-content: space-between; }
+    .pg .meta { font-size: 11pt; margin-bottom: 3mm; }
+    .pg .overview { display: block; max-width: 186mm; max-height: 120mm; margin: 0 auto 4mm; image-rendering: pixelated; }
+    .legend { width: 100%; border-collapse: collapse; font-size: 10pt; }
+    .legend th, .legend td { border: .3mm solid #000; padding: .8mm 2mm; text-align: left; }
+    .legend .sw { width: 9mm; height: 6mm; font-size: 9pt; border-width: .3mm; }
+    .legend td.n { text-align: right; }
+    .chart { display: grid; border-top: .5mm solid #000; border-left: .5mm solid #000; width: max-content; }
+    .chart > div { width: 6mm; height: 6mm; display: grid; place-items: center; font-size: 8pt; font-weight: 700; line-height: 1;
+      border-right: .15mm solid #777; border-bottom: .15mm solid #777; }
+    .chart > .lab { font-size: 6.5pt; font-weight: 400; background: #fff; color: #000; border-color: #bbb; }
+    .chart > .tr { border-right: .5mm solid #000; }
+    .chart > .tb { border-bottom: .5mm solid #000; }
+    .minileg { display: flex; flex-wrap: wrap; gap: 1.5mm 4mm; margin-top: 3mm; font-size: 8.5pt; }
+    .minileg span { display: inline-flex; align-items: center; gap: 1mm; }
+    .minileg i { display: inline-grid; place-items: center; width: 6mm; height: 5mm; border: .3mm solid #000; font-style: normal; font-weight: 700; font-size: 7.5pt; }
+    .pfoot { margin-top: 3mm; font-size: 8pt; color: #555; }
+  }
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="logo" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+  <div>
+    <h1>照片轉方塊</h1>
+    <p>把照片變成像素畫、拼豆施工圖和 3D 方塊作品</p>
+  </div>
+</header>
+
+<main>
+  <!-- 開始畫面 -->
+  <section id="start">
+    <div class="card" id="drop">
+      <h2>先選一張照片</h2>
+      <p>可以拍照、從相簿選，或把照片拖到這個框框裡。</p>
+      <div class="acts">
+        <button class="primary" id="btnCamera" type="button">📷 拍照</button>
+        <button id="btnPick" type="button">🖼️ 選照片</button>
+        <button id="btnSample" type="button">✨ 用範例圖</button>
+      </div>
+      <div class="privacy">🔒 照片只在這台裝置上處理，不會上傳到網路。</div>
+    </div>
+    <div class="uses">
+      <div class="card"><b>數學課</b>數一數寬幾格、高幾格，算面積和比例；格線每 10 格有一條粗線。</div>
+      <div class="card"><b>美術課</b>調整格數和顏色數量，做出自己的像素畫，下載成圖片。</div>
+      <div class="card"><b>動手做</b>看色塊統計準備拼豆或積木，印出 A4 施工圖照著拼；也可以匯出 3D 列印檔。</div>
+    </div>
+  </section>
+
+  <!-- 工作畫面 -->
+  <section id="work" hidden>
+    <div>
+      <nav class="tabs" role="tablist">
+        <button type="button" data-tab="2d" class="on" role="tab">2D 馬賽克</button>
+        <button type="button" data-tab="3d" role="tab">3D 方塊</button>
+        <button type="button" data-tab="stats" role="tab">色塊統計</button>
+      </nav>
+      <div class="stage" id="stage">
+        <div id="pane2d"><canvas id="c2d" aria-label="像素馬賽克預覽"></canvas></div>
+        <div id="pane3d" hidden><div class="hint">單指拖曳旋轉・兩指捏合縮放</div></div>
+        <div id="paneStats" hidden></div>
+      </div>
+      <div class="info" id="info"></div>
+    </div>
+
+    <aside class="panel">
+      <div class="card" id="srcCard">
+        <h2>照片</h2>
+        <div class="src">
+          <img id="thumb" alt="原始照片">
+          <div class="col">
+            <button type="button" id="btnCamera2">📷 重新拍照</button>
+            <button type="button" id="btnPick2">🖼️ 換一張照片</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" id="set2d">
+        <h2>格子與顏色</h2>
+        <div class="row">
+          <label for="cols">橫向格數 <output id="colsOut">48</output></label>
+          <input type="range" id="cols" min="16" max="128" step="1" value="48">
+        </div>
+        <div class="row">
+          <div class="lbl">顏色數量</div>
+          <div class="seg" id="countSeg">
+            <button type="button" data-v="4">4 色</button><button type="button" data-v="8">8 色</button>
+            <button type="button" data-v="16">16 色</button><button type="button" data-v="32">32 色</button>
+          </div>
+        </div>
+        <div class="row">
+          <div class="lbl">調色盤</div>
+          <div class="seg pal" id="palSeg">
+            <button type="button" data-v="auto">原圖自動取色</button>
+            <button type="button" data-v="block">方塊遊戲風</button><button type="button" data-v="bead">拼豆色</button>
+            <button type="button" data-v="brick">積木色</button><button type="button" data-v="gray">灰階</button>
+          </div>
+        </div>
+        <div class="row"><button type="button" class="toggle" id="gridT" aria-pressed="true">顯示格線</button></div>
+        <div class="btns">
+          <button type="button" id="dlGrid">⬇ PNG（有格線）</button>
+          <button type="button" id="dlPlain">⬇ PNG（無格線）</button>
+          <button type="button" class="wide" id="btnPrint">🖨️ 列印 A4 施工圖</button>
+        </div>
+        <p class="small">拼豆色、積木色的色號是本工具自己編的，顏色是接近值，買材料時請對照實際顏色。</p>
+      </div>
+
+      <div class="card" id="set3d">
+        <h2>3D 方塊</h2>
+        <div class="row">
+          <div class="lbl">方塊高度</div>
+          <div class="seg" id="modeSeg" style="--n:3">
+            <button type="button" data-v="flat">平面</button><button type="button" data-v="bright">越亮越高</button><button type="button" data-v="dark">越暗越高</button>
+          </div>
+        </div>
+        <div class="row">
+          <label for="mult">高度倍率 <output id="multOut">1 倍</output></label>
+          <input type="range" id="mult" min="0.5" max="3" step="0.5" value="1">
+        </div>
+        <div class="row"><button type="button" class="toggle" id="rotT" aria-pressed="true">自動旋轉</button></div>
+        <div class="btns">
+          <button type="button" id="btnReset" class="wide">↺ 重設視角</button>
+          <button type="button" id="dlShot">⬇ 3D 截圖 PNG</button>
+          <button type="button" id="dlGLB">⬇ GLB 模型</button>
+          <button type="button" id="dlSTL">⬇ STL（3D 列印）</button>
+          <button type="button" id="dlUSDZ">⬇ USDZ</button>
+          <button type="button" id="btnAR" class="wide" hidden>🔍 用 AR 擺在桌上看</button>
+          <a id="arLink" class="btn wide" rel="ar" hidden><img alt="">👉 點這裡開啟 AR</a>
+        </div>
+        <p class="small">GLB、USDZ 最長邊是 40 公分；STL 最長邊 100 mm、沒有顏色，可以直接丟進切片軟體。</p>
+      </div>
+    </aside>
+  </section>
+</main>
+
+<footer>
+  設計：<b>Upsky（阿喵老師）</b>｜製作工具：<b>Claude Code</b><br>
+  標題字型：俐方體 11 號（Cubic 11，SIL Open Font License）｜3D：three.js（MIT）
+</footer>
+
+<input type="file" id="fileCamera" accept="image/*" capture="environment" hidden>
+<input type="file" id="filePick" accept="image/*" hidden>
+<div id="busy" hidden><div id="busyText">處理中…</div></div>
+<div id="toast" hidden></div>
+<div id="print-area"></div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three/three.module.js",
+    "three/addons/": "./vendor/three/addons/"
+  }
+}
+</script>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
