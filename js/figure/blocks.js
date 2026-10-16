@@ -1,5 +1,6 @@
 // 從 xikou-3d-campus 的 js/blocks.js（commit 8cf2eb3）複製並改為獨立方塊風。
 import * as THREE from "three";
+import { drawPaperFace } from './faces.js';
 const BLOCKY = true;
 function rng(seed) {
   return () => { seed |= 0; seed = (seed + 0x6d2b79f5) | 0; let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
@@ -191,29 +192,39 @@ export function makeBlockNPC(look) {
   };
   const armL = arm(-1), armR = arm(1);
   // 手上拿的東西（holdL 左手、holdR 右手）：直笛、羽球拍、羽毛球
-  const holdItem = (armP, kind) => {
-    const rg = new THREE.Group(); armP.add(rg);
+  const holdItem = (armP, kind, side) => {
+    const rg = new THREE.Group(); rg.name = `手拿物_${kind}`; armP.add(rg);
+    // 左右手向外微斜，並放在手掌前方；道具上端不會插進上衣。
+    rg.position.set(side * 0.025, -0.61, -0.19);
+    rg.rotation.set(-0.2, 0, -side * 0.3);
     const M = (color) => new THREE.MeshLambertMaterial({ color });
-    if (kind === 'recorder') {                              // 白色直笛（斜斜往上）
-      rg.position.set(0, -0.6, -0.16); rg.rotation.set(0.25, 0, -0.7);
-      const wm = M('#f6f1e8'), hm = M('#2b2b2b');
-      box(rg, 0.05, 0.56, 0.05, wm, 0, 0.12, 0);
-      box(rg, 0.065, 0.05, 0.065, wm, 0, 0.36, 0);             // 吹嘴那一節
-      box(rg, 0.065, 0.04, 0.065, wm, 0, -0.14, 0);            // 尾端
-      for (let k = 0; k < 5; k++) box(rg, 0.022, 0.022, 0.01, hm, 0, 0.26 - k * 0.07, -0.027).castShadow = false;
-    } else if (kind === 'racket') {                         // 黑色羽球拍（直直立起來）
-      rg.position.set(0, -0.64, -0.12); rg.rotation.set(-0.5, 0, 0); rg.add(makeRacket());
-    } else if (kind === 'brush') {                          // 水彩筆（木頭筆桿、銀色筆箍、沾了顏料的筆毛）
-      rg.position.set(0, -0.64, -0.1); rg.rotation.set(-0.7, 0, 0);
+    box(armP, 0.12, 0.09, 0.14, skin, 0, -0.62, -0.1).name = '握持手掌';
+    if (kind === 'recorder') {
+      const wm = M('#f6f1e8');
+      // 音孔畫在單一表面上，不再把黑色小方塊插進直笛表面。
+      const holeMap = canvasTex((c) => {
+        c.fillStyle = '#f6f1e8'; c.fillRect(0, 0, 64, 64);
+        c.fillStyle = '#2b2b2b';
+        for (let k = 0; k < 6; k++) c.fillRect(21, 8 + k * 9, 22, 4);
+      }, 1, 64, { smooth: false });
+      const front = new THREE.MeshLambertMaterial({ map: holeMap });
+      const shaft = box(rg, 0.05, 0.48, 0.05, wm, 0, 0.1, 0);
+      shaft.material = [wm, wm, wm, wm, wm, front];
+      // 各節首尾相接，不讓端面與另一節的端面重疊外露。
+      box(rg, 0.065, 0.06, 0.065, wm, 0, 0.37, 0);
+      box(rg, 0.065, 0.05, 0.065, wm, 0, -0.165, 0);
+    } else if (kind === 'racket') {
+      rg.add(makeRacket());
+    } else if (kind === 'brush') {
       box(rg, 0.025, 0.3, 0.025, M('#c98b4a'), 0, 0.08, 0);
-      box(rg, 0.03, 0.05, 0.03, M('#c9cdd1'), 0, 0.25, 0);
-      box(rg, 0.035, 0.07, 0.035, M('#e53935'), 0, 0.31, 0);
-    } else if (kind === 'shuttle') {                        // 羽毛球（球頭朝上）
-      rg.position.set(0, -0.7, -0.08); rg.add(makeShuttle());
+      box(rg, 0.03, 0.05, 0.03, M('#c9cdd1'), 0, 0.255, 0);
+      box(rg, 0.035, 0.07, 0.035, M('#e53935'), 0, 0.315, 0);
+    } else if (kind === 'shuttle') {
+      rg.add(makeShuttle());
     }
   };
-  if (look.holdL) holdItem(armL, look.holdL);
-  if (look.holdR) holdItem(armR, look.holdR);
+  if (look.holdL) holdItem(armL, look.holdL, -1);
+  if (look.holdR) holdItem(armR, look.holdR, 1);
 
 
   box(g, 0.47, 0.12, 0.27, pants, 0, 0.72, 0);
@@ -248,6 +259,7 @@ export function makeBlockNPC(look) {
 // NPC 的表情：平常、眨眼、開心笑、眨眼吐舌、驚訝、難過、想睡、吐舌頭
 export const NPC_FACES = ['normal', 'blink', 'happy', 'wink', 'surprised', 'sad', 'sleepy', 'tongue'];
 export function faceDrawer(look) {
+  if (look.paperFace) return (c, ex) => drawPaperFace(c, look, ex);
   const rows = look.face, pal = look.pal;
   const skin = look.cat ? 'W' : 'S', eyeCh = look.cat ? 'Ep' : 'EWep', eyeBg = look.cat ? 'L' : skin;
   // 找出符合條件的像素範圍（左眼、右眼、嘴巴）
@@ -314,8 +326,16 @@ export function makeRacket() {
   box(0.02, rh - 0.08, 0.02, -rw / 2, cy); box(0.02, rh - 0.08, 0.02, rw / 2, cy);
   box(rw - 0.06, 0.02, 0.02, 0, cy + rh / 2); box(rw - 0.06, 0.02, 0.02, 0, cy - rh / 2);
   for (const sx of [-1, 1]) for (const sy of [-1, 1]) box(0.04, 0.04, 0.02, sx * (rw / 2 - 0.02), cy + sy * (rh / 2 - 0.02));
-  const net = new THREE.Mesh(new THREE.PlaneGeometry(rw - 0.01, rh - 0.01), new THREE.MeshLambertMaterial({ color: '#e8e8e8', transparent: true, opacity: 0.45, side: THREE.DoubleSide }));
-  net.position.set(0, cy, 0); g.add(net);
+  // 改成有厚度的網線，避免透明薄片與拍框交錯時出現排序破面。
+  const net = new THREE.MeshLambertMaterial({ color: '#ddd8c8' });
+  for (const x of [-0.06, -0.02, 0.02, 0.06]) {
+    const line = new THREE.Mesh(new THREE.BoxGeometry(0.006, rh - 0.035, 0.006), net);
+    line.position.set(x, cy, -0.004); g.add(line);
+  }
+  for (const y of [-0.08, -0.04, 0, 0.04, 0.08]) {
+    const line = new THREE.Mesh(new THREE.BoxGeometry(rw - 0.035, 0.006, 0.006), net);
+    line.position.set(0, cy + y, 0.004); g.add(line);
+  }
   return g;
 }
 export function makeShuttle() {
@@ -324,7 +344,7 @@ export function makeShuttle() {
   cork.position.y = 0.02; g.add(cork);
   const band = new THREE.Mesh(new THREE.BoxGeometry(0.052, 0.012, 0.052), new THREE.MeshLambertMaterial({ color: '#222222' }));
   band.position.y = 0.045; g.add(band);
-  const fe = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.06, 0.09, 8, 1, true), new THREE.MeshLambertMaterial({ color: '#fbfaf5', side: THREE.DoubleSide }));
+  const fe = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.06, 0.09, 8, 1, false), new THREE.MeshLambertMaterial({ color: '#fbfaf5', side: THREE.DoubleSide }));
   fe.position.y = 0.095; g.add(fe);
   return g;
 }

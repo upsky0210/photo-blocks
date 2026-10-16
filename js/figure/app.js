@@ -7,7 +7,7 @@ const labels={kind:'主角',species:'動物種類',hairstyle:'髮型',hat:'帽�
 let look={...defaults},source,view,working=false,revision=0,pick=null,lastSource=0,queued=false;
 const download=(blob,name)=>{const a=document.createElement('a'),url=URL.createObjectURL(blob);a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);};
 function status(text){$('#figureStatus').textContent=text;}
-function update(){view?.update(look);for(const e of document.querySelectorAll('[data-look]')){const key=e.dataset.look;if(e.type==='checkbox')e.checked=look[key];else e.value=look[key];}$('#personControls').hidden=look.kind!=='person';$('#animalControls').hidden=look.kind!=='animal';$('#personColors').hidden=look.kind!=='person';$('#animalColors').hidden=look.kind!=='animal';}
+function update(){view?.update(look);for(const e of document.querySelectorAll('[data-look]')){const key=e.dataset.look;if(e.type==='checkbox')e.checked=look[key];else e.value=look[key];}$('#personControls').hidden=look.kind!=='person';$('#animalControls').hidden=look.kind!=='animal';$('#personColors').hidden=look.kind!=='person';$('#animalColors').hidden=look.kind!=='animal';$('#glassesAdjust').hidden=look.kind!=='person'||!look.glasses;$('#glassesYOut').textContent=look.glassesY===0?'標準位置':look.glassesY>0?'往上':'往下';}
 function select(key){return `<label class="figure-field">${labels[key]}<select data-look="${key}" aria-label="${labels[key]}">${Object.entries(choices[key]).map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}</select></label>`;}
 function colors(keys){return keys.map(k=>`<div class="figure-color"><label>${colorLabels[k]} <input type="color" data-look="${k}" aria-label="${colorLabels[k]}"></label><button type="button" data-pick="${k}" aria-label="從照片吸取${colorLabels[k]}">吸色</button></div>`).join('');}
 export function initFigure() {
@@ -16,6 +16,7 @@ export function initFigure() {
     <p id="figureStatus" role="status" aria-live="polite">可以先調整，也可以自動辨識照片。</p>
     <div id="personControls" class="figure-fields">${['shirt','bottom'].map(select).join('')}${colors(['top','pants'])}${['hairstyle','hat','holdL','holdR'].map(select).join('')}<fieldset><legend>配件</legend>${Object.entries({scarf:'圍巾',bag:'背包',whistle:'哨子',glasses:'眼鏡'}).map(([k,l])=>`<label class="figure-check"><input type="checkbox" data-look="${k}">${l}</label>`).join('')}</fieldset><p class="small" style="grid-column:1/-1">只拍到半身時，先用黑色長褲。上衣與下半身都可以改顏色。</p></div>
     <div id="animalControls" class="figure-fields" hidden>${select('species')}${select('pattern')}</div>${select('expression')}
+    <div id="glassesAdjust" hidden><label class="figure-field">眼鏡上下位置（低 ↔ 高）<input type="range" data-look="glassesY" min="-0.08" max="0.08" step="0.005" aria-label="眼鏡上下位置"><span class="small"><output id="glassesYOut">標準位置</output></span></label><button type="button" id="glassesAlign">對齊眼睛</button></div>
     <div id="personColors" class="figure-colors">${colors(['skin','hair','sleeve','shoe','accent'])}</div><div id="animalColors" class="figure-colors" hidden>${colors(['main','second','third'])}</div>
     <p id="figurePickHint" class="small">按「吸色」，再點一下上方原始照片。</p>
     <label class="figure-field">名字或暱稱（可以不填）<input id="figureName" maxlength="30" placeholder="我的方塊人偶"></label>
@@ -24,7 +25,10 @@ export function initFigure() {
     <p class="small">STL 最長邊 100 mm，會合成封閉實體並加上必要支柱；細節以方塊呈現。JSON 只存角色設定，不存照片。</p>`;
   look.kind=$('#startKind').value;
   view=new FigureView($('#figureViewport'));update();
-  $('#figurePanel').addEventListener('change',e=>{const key=e.target.dataset.look;if(!key)return;revision++;look[key]=e.target.type==='checkbox'?e.target.checked:e.target.value;update();});
+  const changeLook=e=>{const key=e.target.dataset.look;if(!key)return;revision++;look[key]=e.target.type==='checkbox'?e.target.checked:e.target.type==='range'?Number(e.target.value):e.target.value;update();};
+  $('#figurePanel').addEventListener('change',changeLook);
+  $('#figurePanel').addEventListener('input',e=>{if(e.target.type==='range')changeLook(e);});
+  $('#glassesAlign').onclick=()=>{revision++;look.glassesY=0;update();};
   $('#figurePanel').addEventListener('click',async e=>{
     const button=e.target.closest('button');if(!button)return;
     if(button.dataset.pick){pick=button.dataset.pick;$('#figurePickHint').textContent=`現在點一下原始照片，取得「${colorLabels[pick]}」。`;$('#thumb').style.cursor='crosshair';return;}

@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { makeBlockNPC, canvasTex, NPC_FACES, faceDrawer } from './blocks.js';
 import { makeCat, makeHamster, makeTurtle, makeGlider } from './campus-animals.js';
 import { makeBird } from './bird.js';
+import { PAPER_FACE } from './faces.js';
 
 export const choices = {
   kind: { person: '人', animal: '小動物' },
@@ -15,13 +16,14 @@ export const choices = {
   pattern: { solid: '純色', tabby: '虎斑', patches: '色塊（三花）', spots: '斑點' }
 };
 choices.holdR = choices.holdL;
-export const defaults = { kind:'person', species:'cat', skin:'#edbd96', hair:'#403028', top:'#438db5', sleeve:'#f2eadb', pants:'#161616', shoe:'#493c36', main:'#d99a53', second:'#f5e3bd', third:'#49382d', accent:'#db6650', hairstyle:'short', hat:'none', shirt:'short', bottom:'pants', holdL:'none', holdR:'none', expression:'normal', pattern:'solid', scarf:false, bag:false, whistle:false, glasses:false };
+export const defaults = { kind:'person', species:'cat', skin:'#edbd96', hair:'#403028', top:'#438db5', sleeve:'#f2eadb', pants:'#161616', shoe:'#493c36', main:'#d99a53', second:'#f5e3bd', third:'#49382d', accent:'#db6650', hairstyle:'short', hat:'none', shirt:'short', bottom:'pants', holdL:'none', holdR:'none', expression:'normal', pattern:'solid', scarf:false, bag:false, whistle:false, glasses:false, glassesY:0 };
 export function sanitize(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw Error('角色檔格式不正確');
   const out = { ...defaults };
   for (const key of Object.keys(defaults)) {
     const v = input[key];
     if (choices[key] && Object.hasOwn(choices[key],v)) out[key] = v;
+    else if (key === 'glassesY' && typeof v === 'number' && Number.isFinite(v)) out[key] = Math.max(-.08,Math.min(.08,v));
     else if (typeof defaults[key] === 'boolean' && typeof v === 'boolean') out[key] = v;
     else if (typeof defaults[key] === 'string' && defaults[key].startsWith('#') && typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v)) out[key] = v;
   }
@@ -30,8 +32,8 @@ export function sanitize(input) {
 export function npcLook(s) {
   // 所有角色共用新畫的臉模板，不使用照片五官或老師資料。
   return { skin:s.skin, hair:s.hair, top:s.top, pants:s.pants, shoe:s.shoe,
-    face:['HHHHHHHHHHHHHHHH','HHHHHHHHHHHHHHHH','HHHHHHHHHHHHHHHH','HHHHSSSSSSSSHHHH','HSSSSSSSSSSSSSSH','SSSSSSSSSSSSSSSS','SSSSEESSSSEESSSS','SSSSEESSSSEESSSS','SSSSSSSSSSSSSSSS','SSSSSSSSSSSSSSSS','SSSSSSSSSSSSSSSS','SSSSSSMMMMSSSSSS','SSSSSSSSSSSSSSSS','SSSSSSSSSSSSSSSS','SSSSSSSSSSSSSSSS','SSSSSSSSSSSSSSSS'],
-    pal:{ H:s.hair,h:s.hair,S:s.skin,N:s.skin,E:'#26232c',M:'#7d3e40' },
+    face:PAPER_FACE, paperFace:true,
+    pal:{ H:s.hair,h:s.hair,S:s.skin,N:s.skin,W:'#fff9ed',E:'#26232c',M:'#95414c' },
     shortHair:s.hairstyle==='short', longHair:s.hairstyle==='long', spiky:s.hairstyle==='spiky', bun:s.hairstyle==='bun',
     cap:s.hat==='cap'?{color:s.accent}:null, beret:s.hat==='beret'?{color:s.accent,letter:'#fff5de'}:null, beanie:s.hat==='beanie'?s.accent:null,
     longSleeve:['long','hoodie','layered'].includes(s.shirt), sleeve:s.shirt==='layered'?s.sleeve:null, sleeveless:s.shirt==='sleeveless', collar:s.shirt==='layered'?s.sleeve:['collar','tie'].includes(s.shirt)?'#fff5de':null,
@@ -61,10 +63,17 @@ export function createFigure(s) {
   let g;
   if(s.kind==='person') {
     g=makeBlockNPC(npcLook(s));g.userData.setFace(s.expression);
-    if(s.glasses) for(const x of [-.1,.1]) {
-      for(const y of [1.57,1.67]) box(g,.18,.015,.018,'#252532',x,y,-.242);
-      for(const dx of [-.09,.09]) box(g,.015,.11,.018,'#252532',x+dx,1.62,-.242);
-      box(g,.04,.015,.018,'#252532',0,1.62,-.242);
+    if(s.glasses) {
+      const frames=new THREE.Group();frames.name='眼鏡';frames.position.set(0,1.58+(Number(s.glassesY)||0),-.26);g.add(frames);
+      for(const x of [-.115,.115]) {
+        for(const y of [-.065,.065]) box(frames,.19,.014,.018,'#252532',x,y,0);
+        for(const dx of [-.095,.095]) box(frames,.014,.13,.018,'#252532',x+dx,0,0);
+      }
+      box(frames,.05,.014,.018,'#252532',0,.018,0); // 鼻橋只畫一份，避免重疊面。
+      for(const side of [-1,1]){
+        box(frames,.035,.014,.018,'#252532',side*.225,.052,0);
+        box(frames,.014,.014,.24,'#252532',side*.24,.052,.11);
+      }
     }
     if(s.bag) { box(g,.35,.43,.14,s.accent,0,1.02,.2); }
   } else {
