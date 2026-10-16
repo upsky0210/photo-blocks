@@ -2,8 +2,8 @@ import { choices, defaults, sanitize, npcLook } from './model.js';
 import { FigureView } from './view.js';
 
 const $=s=>document.querySelector(s);
-const colorLabels={skin:'膚色',hair:'髮色',top:'上衣',pants:'褲子／裙子',shoe:'鞋子',accent:'配件',main:'主色',second:'第二色',third:'第三色'};
-const labels={kind:'主角',species:'動物種類',hairstyle:'髮型',hat:'帽子',shirt:'上衣樣式',bottom:'褲子或裙子',holdL:'左手拿',holdR:'右手拿',expression:'表情',pattern:'花色'};
+const colorLabels={skin:'膚色',hair:'髮色',top:'上衣顏色',sleeve:'疊穿袖子',pants:'下半身顏色',shoe:'鞋子',accent:'配件',main:'主色',second:'第二色',third:'第三色'};
+const labels={kind:'主角',species:'動物種類',hairstyle:'髮型',hat:'帽子',shirt:'上衣樣式',bottom:'下半身',holdL:'左手拿',holdR:'右手拿',expression:'表情',pattern:'花色'};
 let look={...defaults},source,view,working=false,revision=0,pick=null,lastSource=0,queued=false;
 const download=(blob,name)=>{const a=document.createElement('a'),url=URL.createObjectURL(blob);a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),60000);};
 function status(text){$('#figureStatus').textContent=text;}
@@ -14,9 +14,9 @@ export function initFigure() {
   $('#figurePanel').innerHTML=`<h2>創作我的方塊人偶</h2><p class="small">照片留在裝置上，五官使用可愛像素模板。</p>${select('kind')}
     <div class="figure-actions"><button id="figureRecognize" type="button">重新自動辨識</button><button id="figureRandom" type="button">🎲 隨機搭配</button></div>
     <p id="figureStatus" role="status" aria-live="polite">可以先調整，也可以自動辨識照片。</p>
-    <div id="personControls" class="figure-fields">${['hairstyle','hat','shirt','bottom','holdL','holdR'].map(select).join('')}<fieldset><legend>配件</legend>${Object.entries({scarf:'圍巾',bag:'背包',whistle:'哨子',glasses:'眼鏡'}).map(([k,l])=>`<label class="figure-check"><input type="checkbox" data-look="${k}">${l}</label>`).join('')}</fieldset></div>
+    <div id="personControls" class="figure-fields">${['shirt','bottom'].map(select).join('')}${colors(['top','pants'])}${['hairstyle','hat','holdL','holdR'].map(select).join('')}<fieldset><legend>配件</legend>${Object.entries({scarf:'圍巾',bag:'背包',whistle:'哨子',glasses:'眼鏡'}).map(([k,l])=>`<label class="figure-check"><input type="checkbox" data-look="${k}">${l}</label>`).join('')}</fieldset><p class="small" style="grid-column:1/-1">只拍到半身時，先用黑色長褲。上衣與下半身都可以改顏色。</p></div>
     <div id="animalControls" class="figure-fields" hidden>${select('species')}${select('pattern')}</div>${select('expression')}
-    <div id="personColors" class="figure-colors">${colors(['skin','hair','top','pants','shoe','accent'])}</div><div id="animalColors" class="figure-colors" hidden>${colors(['main','second','third'])}</div>
+    <div id="personColors" class="figure-colors">${colors(['skin','hair','sleeve','shoe','accent'])}</div><div id="animalColors" class="figure-colors" hidden>${colors(['main','second','third'])}</div>
     <p id="figurePickHint" class="small">按「吸色」，再點一下上方原始照片。</p>
     <label class="figure-field">名字或暱稱（可以不填）<input id="figureName" maxlength="30" placeholder="我的方塊人偶"></label>
     <div class="figure-actions">${['png','glb','stl','usdz','json'].map((k,i)=>`<button type="button" data-figure-export="${k}">${['角色卡 PNG','GLB 模型','STL 列印','USDZ／AR','儲存角色 JSON'][i]}</button>`).join('')}<button type="button" id="figureOpen">開啟角色 JSON</button></div>

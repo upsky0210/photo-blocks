@@ -185,9 +185,9 @@
   .figure-check { display:inline-flex; align-items:center; min-height:48px; margin-right:8px; }
   .figure-check input { width:22px; height:22px; }
   .figure-color { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:5px; border:1px solid #c9bfa8; }
-  .figure-color label { display:flex; flex-direction:column; gap:4px; }
+  .figure-color label { display:flex; flex-direction:column; gap:4px; font-size:14px; min-width:0; }
   .figure-color input { width:62px; height:44px; padding:2px; }
-  .figure-color button { min-height:44px; padding:6px; box-shadow:2px 2px 0 var(--ink); }
+  .figure-color button { min-height:44px; padding:6px; box-shadow:2px 2px 0 var(--ink); flex-shrink:0; white-space:nowrap; }
   .figure-actions { display:flex; flex-wrap:wrap; gap:10px; margin:14px 0; }
   .figure-actions button { flex:1 1 120px; }
   #figureStatus { padding:10px; background:#fff6c2; line-height:1.6; }
@@ -197,7 +197,7 @@
   body.figure-active #figurePanel { grid-column:1/-1; }
   body.figure-active #srcCard { order:0; }
   body.figure-active .src { flex-wrap:wrap; }
-  body.figure-active .src img { width:100%; height:auto; max-height:none; object-fit:fill; }
+  body.figure-active .src img { width:auto; max-width:100%; height:auto; max-height:320px; object-fit:contain; }
   @media(max-width:480px) { .figure-toolbar {gap:6px;} #figureViewport {bottom:124px;} .figure-fields,.figure-colors {grid-template-columns:1fr;} }
 
 </style>

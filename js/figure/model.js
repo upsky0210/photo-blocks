@@ -8,14 +8,14 @@ export const choices = {
   species: { cat: '貓', dog: '狗', rabbit: '兔子', bird: '鳥', hamster: '倉鼠', turtle: '烏龜', glider: '蜜袋鼯' },
   hairstyle: { short: '短髮', long: '長髮', spiky: '刺刺頭', bun: '髮髻' },
   hat: { none: '沒有', cap: '棒球帽', beret: '貝雷帽', beanie: '毛線帽' },
-  shirt: { short: '短袖', long: '長袖', collar: '有領上衣', tie: '領帶', hoodie: '連帽外套', sleeveless: '無袖' },
-  bottom: { pants: '褲子', skirt: '裙子' },
+  shirt: { short: '短袖', long: '長袖', layered: '背心疊穿長袖', collar: '有領上衣', tie: '領帶', hoodie: '連帽外套', sleeveless: '無袖' },
+  bottom: { pants: '長褲', skirt: '長裙', shortSkirt: '短裙', shorts: '短褲' },
   holdL: { none: '沒有', recorder: '直笛', racket: '球拍', shuttle: '羽毛球', brush: '水彩筆' },
   expression: Object.fromEntries(NPC_FACES.map((k,i) => [k,['平常','眨眼','開心笑','眨眼吐舌','驚訝','難過','想睡','吐舌頭'][i]])),
   pattern: { solid: '純色', tabby: '虎斑', patches: '色塊（三花）', spots: '斑點' }
 };
 choices.holdR = choices.holdL;
-export const defaults = { kind:'person', species:'cat', skin:'#edbd96', hair:'#403028', top:'#438db5', pants:'#37475f', shoe:'#493c36', main:'#d99a53', second:'#f5e3bd', third:'#49382d', accent:'#db6650', hairstyle:'short', hat:'none', shirt:'short', bottom:'pants', holdL:'none', holdR:'none', expression:'normal', pattern:'solid', scarf:false, bag:false, whistle:false, glasses:false };
+export const defaults = { kind:'person', species:'cat', skin:'#edbd96', hair:'#403028', top:'#438db5', sleeve:'#f2eadb', pants:'#161616', shoe:'#493c36', main:'#d99a53', second:'#f5e3bd', third:'#49382d', accent:'#db6650', hairstyle:'short', hat:'none', shirt:'short', bottom:'pants', holdL:'none', holdR:'none', expression:'normal', pattern:'solid', scarf:false, bag:false, whistle:false, glasses:false };
 export function sanitize(input) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw Error('角色檔格式不正確');
   const out = { ...defaults };
@@ -34,9 +34,9 @@ export function npcLook(s) {
     pal:{ H:s.hair,h:s.hair,S:s.skin,N:s.skin,E:'#26232c',M:'#7d3e40' },
     shortHair:s.hairstyle==='short', longHair:s.hairstyle==='long', spiky:s.hairstyle==='spiky', bun:s.hairstyle==='bun',
     cap:s.hat==='cap'?{color:s.accent}:null, beret:s.hat==='beret'?{color:s.accent,letter:'#fff5de'}:null, beanie:s.hat==='beanie'?s.accent:null,
-    longSleeve:['long','hoodie'].includes(s.shirt), sleeveless:s.shirt==='sleeveless', collar:['collar','tie'].includes(s.shirt)?'#fff5de':null,
+    longSleeve:['long','hoodie','layered'].includes(s.shirt), sleeve:s.shirt==='layered'?s.sleeve:null, sleeveless:s.shirt==='sleeveless', collar:s.shirt==='layered'?s.sleeve:['collar','tie'].includes(s.shirt)?'#fff5de':null,
     tie:s.shirt==='tie'?s.accent:null, hoodie:s.shirt==='hoodie'?'#fff5de':null, pocket:s.top,
-    skirt:s.bottom==='skirt'?s.pants:null, scarf:s.scarf?[s.accent,'#fff5de']:null, bag:s.bag?s.accent:null, whistle:s.whistle,
+    skirt:['skirt','shortSkirt'].includes(s.bottom)?s.pants:null, shortSkirt:s.bottom==='shortSkirt', shorts:s.bottom==='shorts', scarf:s.scarf?[s.accent,'#fff5de']:null, bag:s.bag?s.accent:null, whistle:s.whistle,
     holdL:s.holdL==='none'?null:s.holdL, holdR:s.holdR==='none'?null:s.holdR };
 }
 function box(g,w,h,d,color,x,y,z) {

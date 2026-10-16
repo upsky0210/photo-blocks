@@ -164,7 +164,11 @@ export function makeBlockNPC(look) {
     const strap = box(g, 0.03, 0.66, 0.015, cloth(look.bag), 0.02, 1.03, -0.14); strap.rotation.z = -0.62;
     box(g, 0.22, 0.17, 0.09, cloth(look.bag), -0.2, 0.76, -0.12);
   }
-  if (look.skirt) box(g, 0.5, 0.62, 0.3, cloth(look.skirt), 0, 0.42, 0);   // 長裙（蓋到腳踝）
+  if (look.skirt) {
+    const h = look.shortSkirt ? 0.32 : 0.62;
+    const skirt = box(g, 0.5, h, 0.3, cloth(look.skirt), 0, 0.73 - h / 2, 0);
+    skirt.name = look.shortSkirt ? '短裙' : '長裙';
+  }
   if (look.whistle) {
     box(g, 0.02, 0.2, 0.01, cloth('#1e88e5'), -0.06, 1.2, -0.135);   // 掛繩
     box(g, 0.02, 0.2, 0.01, cloth('#1e88e5'), 0.06, 1.2, -0.135);
@@ -215,7 +219,12 @@ export function makeBlockNPC(look) {
   box(g, 0.47, 0.12, 0.27, pants, 0, 0.72, 0);
   const leg = (side) => {
     const p = pivot(side * 0.12, 0.7);
-    box(p, 0.21, 0.58, 0.22, pants, 0, -0.29, 0);
+    // 短褲和裙子底下露出腿；不再讓長褲穿出短裙。
+    box(p, 0.19, 0.58, 0.2, skin, 0, -0.29, 0).name = '腿';
+    if (!look.skirt) {
+      const h = look.shorts ? 0.28 : 0.58;
+      box(p, 0.21, h, 0.22, pants, 0, -h / 2, 0).name = look.shorts ? '短褲' : '長褲';
+    }
     if (look.stripe) box(p, 0.02, 0.58, 0.06, cloth(look.stripe), side * 0.11, -0.29, 0);   // 運動褲側條
     box(p, 0.21, 0.09, 0.27, shoe, 0, -0.62, -0.03);
     return p;

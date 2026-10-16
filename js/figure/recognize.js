@@ -44,6 +44,51 @@ function copyMask(result) {
   const m=result.categoryMask;if(!m)throw Error('辨識沒有產生區域');
   return {data:m.getAsUint8Array().slice(),width:m.width,height:m.height};
 }
+
+// 插畫可能只被物件偵測器認出人物，沒有可靠的人像分割。
+// 這時依人物框的頭部、衣服區域取色；不把這種近似結果當成成功的分割。
+export function illustrationColors(data, box) {
+  if(!box)return null;
+  const bounds={x:box.originX/data.width,y:box.originY/data.height,w:box.width/data.width,h:box.height/data.height};
+  const at=(x,y)=>{
+    const i=(Math.min(data.height-1,Math.max(0,Math.floor(y*data.height)))*data.width+Math.min(data.width-1,Math.max(0,Math.floor(x*data.width))))*4;
+    return [...data.data.slice(i,i+3)];
+  };
+  const relative=(x,y)=>[(x-bounds.x)/bounds.w,(y-bounds.y)/bounds.h];
+  const inRegion=(x,y,x0,x1,y0,y1)=>{const [u,v]=relative(x,y);return u>x0&&u<x1&&v>y0&&v<y1;};
+  const distance=(a,b)=>Math.hypot(...a.map((v,i)=>v-b[i]));
+  const corners=[[0,0],[.999,0],[0,.999],[.999,.999]].map(([x,y])=>rgbToLab(...at(x,y)));
+  const foreground=(x,y)=>{const lab=rgbToLab(...at(x,y));return !corners.some(c=>distance(lab,c)<5);};
+  const warm=(x,y)=>{const [r,g,b]=at(x,y),l=rgbToLab(r,g,b)[0];return r>g+5&&g>b+8&&r-b>25&&l>56&&l<94;};
+  const skins=dominant(data,(x,y)=>inRegion(x,y,.24,.76,.12,.4)&&warm(x,y),3);
+  const skin=skins.filter(c=>c.n>skins.reduce((n,c)=>n+c.n,0)*.12).sort((a,b)=>b.lab[0]-a.lab[0])[0];
+  if(!skin)return null;
+  const hair=dominant(data,(x,y)=>{
+    if(!inRegion(x,y,.08,.92,.02,.42)||!foreground(x,y))return false;
+    const lab=rgbToLab(...at(x,y));return lab[0]<skin.lab[0]-10&&distance(lab,skin.lab)>20;
+  })[0];
+  if(!hair)return null;
+  const top=dominant(data,(x,y)=>inRegion(x,y,.3,.7,.42,.66)&&foreground(x,y)&&distance(rgbToLab(...at(x,y)),skin.lab)>14)[0];
+  const sleeve=dominant(data,(x,y)=>{
+    const [u,v]=relative(x,y);
+    return ((u>.1&&u<.27)||(u>.73&&u<.9))&&v>.4&&v<.62&&foreground(x,y)&&distance(rgbToLab(...at(x,y)),skin.lab)>12;
+  })[0];
+  let hairCount=0,lowHair=0;
+  for(let y=0;y<data.height;y+=3)for(let x=0;x<data.width;x+=3){
+    const nx=x/data.width,ny=y/data.height;
+    if(!inRegion(nx,ny,.04,.96,.02,.64))continue;
+    if(distance(rgbToLab(...at(nx,ny)),hair.lab)<22){hairCount++;if(relative(nx,ny)[1]>.38)lowHair++;}
+  }
+  return {skin:skin.hex,hair:hair.hex,hairstyle:hairCount&&lowHair/hairCount>.06?'long':'short',top:top?.hex,sleeve:sleeve?.hex,
+    shirt:top&&sleeve&&distance(top.lab,sleeve.lab)>22?'layered':'long'};
+}
+
+export function visibleLowerBody(landmarks) {
+  // 姿勢模型會猜測畫面外的腳；可見度高但座標在照片外也不能採用。
+  return !!landmarks&&[23,24,25,26,27,28].every(i=>{
+    const p=landmarks[i];return p&&p.visibility>.55&&p.x>.015&&p.x<.985&&p.y>.015&&p.y<.985;
+  });
+}
 export async function recognize(canvas,current,progress,point,cpu=false) {
   const data=canvas.getContext('2d',{willReadFrequently:true}).getImageData(0,0,canvas.width,canvas.height);
   let worker;
@@ -57,7 +102,10 @@ export async function recognize(canvas,current,progress,point,cpu=false) {
     const animal=animals[0];
     const kind=point?'animal':person&&(!animal||person.categories[0].score>=animal.categories[0].score)?'person':animal?'animal':current.kind;
     if(kind==='animal') {
-      if(!animal&&!point) return null;
+      if(!animal&&!point) {
+        if(!cpu){progress('改用 CPU 確認辨識結果…');return recognize(canvas,current,progress,point,true);}
+        return null;
+      }
       s.kind='animal';const category=animal?.categories[0].categoryName;
       if(['cat','dog','bird'].includes(category))s.species=category;
       const b=animal?.boundingBox;
@@ -80,30 +128,48 @@ export async function recognize(canvas,current,progress,point,cpu=false) {
     worker=await task('ImageSegmenter','selfie.tflite',{runningMode:'IMAGE',outputCategoryMask:true,outputConfidenceMasks:false},progress,cpu);
     let mask;worker.segment(canvas,r=>{mask=copyMask(r);});worker.close();worker=null;
     const face=dominant(data,(x,y)=>maskAt(mask,x,y)===3);
-    if(!face.length)return null;
-    s.kind='person';s.skin=face[0].hex;
-    const hair=dominant(data,(x,y)=>maskAt(mask,x,y)===1);if(hair.length)s.hair=hair[0].hex;
+    const hair=dominant(data,(x,y)=>maskAt(mask,x,y)===1);
+    const faceArea=mask.data.reduce((n,c)=>n+(c===3),0)/mask.data.length;
+    const fallback=(!face.length||!hair.length||faceArea<.003)?illustrationColors(data,person?.boundingBox):null;
+    // 有些 GPU 不報錯卻回傳空白區域；仍要用 CPU 再確認，不能直接留預設造型。
+    if(!cpu&&!fallback&&(!face.length||!hair.length||faceArea<.003)){
+      progress('改用 CPU 確認人物顏色…');return recognize(canvas,current,progress,point,true);
+    }
+    if(!face.length&&!fallback)return null;
+    s.kind='person';if(face.length)s.skin=face[0].hex;if(hair.length)s.hair=hair[0].hex;
     progress('辨識肩膀、腰與手腳…');await next();
-    worker=await task('PoseLandmarker','pose.task',{runningMode:'IMAGE',numPoses:1},progress,cpu);
-    const landmarks=worker.detect(canvas).landmarks[0];worker.close();worker=null;
+    let landmarks;
+    for(const useCPU of cpu?[true]:[false,true]) {
+      try {
+        worker=await task('PoseLandmarker','pose.task',{runningMode:'IMAGE',numPoses:1},progress,useCPU);
+        landmarks=worker.detect(canvas).landmarks[0];if(landmarks)break;
+      } catch(error) {progress('姿勢不完整，保留已取出的顏色…');}
+      finally {worker?.close();worker=null;}
+    }
     const valid=i=>landmarks&&landmarks[i].visibility>.45;
     const hip=valid(23)&&valid(24)?(landmarks[23].y+landmarks[24].y)/2:.62;
     const shoulder=valid(11)&&valid(12)?(landmarks[11].y+landmarks[12].y)/2:.36;
     const top=dominant(data,(x,y)=>maskAt(mask,x,y)===4&&y<hip);
     const pants=dominant(data,(x,y)=>maskAt(mask,x,y)===4&&y>=hip);
-    if(top.length)s.top=top[0].hex;if(pants.length)s.pants=pants[0].hex;
+    if(top.length)s.top=top[0].hex;
+    // 半身照不能用衣服底端、背景或上次的裙褲來猜下半身。
+    const fullBody=visibleLowerBody(landmarks);
+    s.bottom='pants';s.pants='#161616';
+    if(fullBody&&pants.length)s.pants=pants[0].hex;
     let lowHair=0,allHair=0;for(let y=0;y<mask.height;y++)for(let x=0;x<mask.width;x++)if(mask.data[y*mask.width+x]===1){allHair++;if(y/mask.height>shoulder)lowHair++;}
     s.hairstyle=allHair&&lowHair/allHair>.06?'long':'short';
     if(landmarks) {
       const sleeves=[13,14].filter(valid).map(i=>maskAt(mask,Math.max(0,Math.min(.999,landmarks[i].x)),Math.max(0,Math.min(.999,landmarks[i].y))));
       s.shirt=sleeves.length&&sleeves.filter(v=>v===4).length>sleeves.length/2?'long':'short';
-      if(valid(25)&&valid(26)) {
+      if(fullBody) {
         const y=(landmarks[25].y+landmarks[26].y)/2, x=(landmarks[25].x+landmarks[26].x)/2;
         s.bottom=y>hip&&y<1&&x>0&&x<1&&maskAt(mask,x,y)===4?'skirt':'pants';
       }
-      const shoes=dominant(data,(x,y)=>y>hip+.65*(1-hip)&&maskAt(mask,x,y)>0);if(shoes.length)s.shoe=shoes[0].hex;
+      const shoes=fullBody?dominant(data,(x,y)=>y>hip+.65*(1-hip)&&maskAt(mask,x,y)>0):[];if(shoes.length)s.shoe=shoes[0].hex;
     }
-    return {look:s,note:landmarks?'已做好人偶初稿！髮型、袖長與裙褲可以再調整。':'已取出膚色和髮色；照片未拍到完整身體，請調整衣服。'};
+    if(fallback){for(const [key,value]of Object.entries(fallback))if(value)s[key]=value;}
+    const lowerNote=fullBody?'下半身也可以改成長裙、長褲、短裙或短褲。':'照片沒有完整下半身，已先用黑色長褲；也可以改成裙子或短褲。';
+    return {look:s,note:(fallback?'插畫分割不完整，已依人物區域近似取色，請再確認髮型與上衣。':'已做好人偶初稿！')+lowerNote};
   } catch(error) {
     worker?.close();worker=null;
     if(!cpu){progress('改用 CPU 再試一次…');await next();return recognize(canvas,current,progress,point,true);}
