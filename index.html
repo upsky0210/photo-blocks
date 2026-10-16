@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>照片轉方塊</title>
-<meta name="description" content="把照片變成方塊風格的像素馬賽克、拼豆施工圖和可以 360° 旋轉的 3D 方塊作品。照片只在你的裝置上處理，不會上傳。">
+<meta name="description" content="把照片變成方塊人偶、像素馬賽克、拼豆施工圖和可以 360° 旋轉的 3D 方塊作品。照片只在你的裝置上處理，不會上傳。">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 4 4' shape-rendering='crispEdges'%3E%3Crect width='2' height='2' fill='%235d9b3a'/%3E%3Crect x='2' width='2' height='2' fill='%23f5d33a'/%3E%3Crect y='2' width='2' height='2' fill='%233f6fd8'/%3E%3Crect x='2' y='2' width='2' height='2' fill='%23c8312a'/%3E%3C/svg%3E">
 <style>
   @font-face { font-family: "Cubic 11"; src: url("fonts/Cubic_11.woff2") format("woff2"); font-display: swap; }
@@ -171,6 +171,35 @@
     .minileg i { display: inline-grid; place-items: center; width: 6mm; height: 5mm; border: .3mm solid #000; font-style: normal; font-weight: 700; font-size: 7.5pt; }
     .pfoot { margin-top: 3mm; font-size: 8pt; color: #555; }
   }
+
+  #figureViewport { position:absolute; inset:0 0 76px; touch-action:none; }
+  #figureViewport canvas { display:block; width:100%; height:100%; touch-action:none; }
+  .figure-toolbar { position:absolute; bottom:8px; left:8px; right:8px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+  .figure-toolbar button { padding:6px 10px; min-height:44px; }
+  .figure-toolbar label { background:#fbf6ea; padding:8px; }
+  #figureProgress { position:absolute; top:12px; left:12px; right:12px; padding:12px; background:#fff6c2; border:2px solid #2b2b2b; pointer-events:none; }
+  .figure-field { display:flex; flex-direction:column; gap:6px; margin:10px 0; font-weight:700; }
+  .figure-field select,.figure-field input { font:inherit; min-height:48px; width:100%; border:2px solid var(--ink); padding:8px; background:#fff; color:var(--ink); }
+  .figure-fields,.figure-colors { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+  .figure-fields fieldset { grid-column:1/-1; border:2px solid var(--ink); }
+  .figure-check { display:inline-flex; align-items:center; min-height:48px; margin-right:8px; }
+  .figure-check input { width:22px; height:22px; }
+  .figure-color { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:5px; border:1px solid #c9bfa8; }
+  .figure-color label { display:flex; flex-direction:column; gap:4px; }
+  .figure-color input { width:62px; height:44px; padding:2px; }
+  .figure-color button { min-height:44px; padding:6px; box-shadow:2px 2px 0 var(--ink); }
+  .figure-actions { display:flex; flex-wrap:wrap; gap:10px; margin:14px 0; }
+  .figure-actions button { flex:1 1 120px; }
+  #figureStatus { padding:10px; background:#fff6c2; line-height:1.6; }
+  body.figure-active #set2d, body.figure-active #set3d, body.figure-active #out2d, body.figure-active #out3d { display:none; }
+  body.figure-active .panel > .card:not(#srcCard):not(#figurePanel) { display:none; }
+  body.figure-active #info { display:none; }
+  body.figure-active #figurePanel { grid-column:1/-1; }
+  body.figure-active #srcCard { order:0; }
+  body.figure-active .src { flex-wrap:wrap; }
+  body.figure-active .src img { width:100%; height:auto; max-height:none; object-fit:fill; }
+  @media(max-width:480px) { .figure-toolbar {gap:6px;} #figureViewport {bottom:124px;} .figure-fields,.figure-colors {grid-template-columns:1fr;} }
+
 </style>
 </head>
 <body>
@@ -178,7 +207,7 @@
   <div class="logo" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
   <div>
     <h1>照片轉方塊</h1>
-    <p>把照片變成像素畫、拼豆施工圖和 3D 方塊作品</p>
+    <p>把照片變成方塊人偶、像素畫、拼豆施工圖和 3D 方塊作品</p>
   </div>
 </header>
 
@@ -188,6 +217,7 @@
     <div class="card" id="drop">
       <h2>先選一張照片</h2>
       <p>可以拍照、從相簿選，或把照片拖到這個框框裡。</p>
+      <label class="figure-field" style="max-width:300px;margin:16px auto">想做哪一種主角？<select id="startKind"><option value="person">人</option><option value="animal">小動物</option></select></label>
       <div class="acts">
         <button class="primary" id="btnCamera" type="button">📷 拍照</button>
         <button id="btnPick" type="button">🖼️ 選照片</button>
@@ -206,12 +236,14 @@
   <section id="work" hidden>
     <div>
       <nav class="tabs" role="tablist">
-        <button type="button" data-tab="2d" class="on" role="tab">2D 馬賽克</button>
+        <button type="button" data-tab="figure" class="on" role="tab">方塊人偶</button>
+        <button type="button" data-tab="2d" role="tab">2D 馬賽克</button>
         <button type="button" data-tab="3d" role="tab">3D 方塊</button>
         <button type="button" data-tab="stats" role="tab">色塊統計</button>
       </nav>
       <div class="stage" id="stage">
-        <div id="pane2d"><canvas id="c2d" aria-label="像素馬賽克預覽"></canvas></div>
+        <div id="paneFigure"><div id="figureViewport"></div><div id="figureProgress" role="status" hidden></div><div class="figure-toolbar"><button type="button" id="figureWave">揮揮手</button><button type="button" id="figureJump">跳一下</button><button type="button" id="figureReset">重設視角</button><label><input type="checkbox" id="figureRotate" checked>自動旋轉</label></div></div>
+        <div id="pane2d" hidden><canvas id="c2d" aria-label="像素馬賽克預覽"></canvas></div>
         <div id="pane3d" hidden><div class="hint">單指拖曳旋轉・兩指捏合縮放</div></div>
         <div id="paneStats" hidden></div>
       </div>
@@ -230,6 +262,7 @@
         </div>
       </div>
 
+      <div class="card" id="figurePanel" hidden></div>
       <div class="card" id="set2d">
         <h2>格子與顏色</h2>
         <div class="row">

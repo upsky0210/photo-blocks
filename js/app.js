@@ -4,14 +4,15 @@ import { PALETTES } from './palettes.js';
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
 
-const state = { cols: 48, count: 16, palette: 'auto', grid: true, tab: '2d', mode: 'bright', mult: 1, rotate: true };
-try { Object.assign(state, JSON.parse(localStorage.getItem('photo-blocks') || '{}'), { tab: '2d' }); } catch (e) {}
+const state = { cols: 48, count: 16, palette: 'auto', grid: true, tab: 'figure', mode: 'bright', mult: 1, rotate: true };
+try { Object.assign(state, JSON.parse(localStorage.getItem('photo-blocks') || '{}'), { tab: 'figure' }); } catch (e) {}
 const save = () => { try { localStorage.setItem('photo-blocks', JSON.stringify(state)); } catch (e) {} };
 
 let srcData = null;   // 縮小後的照片像素
 let cells = null;     // 每格平均色（Lab）
 let mosaic = null;    // 對應到調色盤後的結果
 let imageId = 0;
+let figureApp = null, figureSource = null, figurePromise = null;
 let view = null, v3 = null, fitKey = '', dirty3d = true;
 
 // ---------- 小工具 ----------
@@ -47,10 +48,13 @@ function setSource(img, w, h) {
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(img, 0, 0, cv.width, cv.height);
   srcData = ctx.getImageData(0, 0, cv.width, cv.height);
+  figureSource = cv;
   $('#thumb').src = cv.toDataURL('image/jpeg', 0.8);
   cells = null; imageId++;
   $('#start').hidden = true; $('#work').hidden = false;
   recompute();
+  setTab(state.tab);
+  if (figureApp && state.tab !== 'figure') figureApp.setFigureSource(cv, imageId);
 }
 
 async function loadFile(file) {
@@ -188,7 +192,10 @@ function update3D() {
 // ---------- 分頁 ----------
 async function setTab(tab) {
   state.tab = tab;
-  $$('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === tab));
+  $$('.tabs button').forEach(b => { const selected = b.dataset.tab === tab; b.classList.toggle('on', selected); b.setAttribute('aria-selected', String(selected)); });
+  $('#paneFigure').hidden = tab !== 'figure';
+  $('#figurePanel').hidden = tab !== 'figure';
+  document.body.classList.toggle('figure-active', tab === 'figure');
   $('#pane2d').hidden = tab !== '2d';
   $('#pane3d').hidden = tab !== '3d';
   $('#paneStats').hidden = tab !== 'stats';
@@ -198,6 +205,15 @@ async function setTab(tab) {
     if (dirty3d) update3D();
     view.start();
   } else if (view) view.stop();
+  if (figureApp) figureApp.showFigure(tab === 'figure');
+  if (tab === 'figure') {
+    try {
+      figurePromise ||= import('./figure/app.js').then(m => { m.initFigure(); figureApp = m; return m; }).catch(e => { figurePromise = null; throw e; });
+      const f = await figurePromise;
+      f.showFigure(state.tab === 'figure');
+      f.setFigureSource(figureSource, imageId);
+    } catch(e) { console.error(e); toast('人偶畫面無法開啟，請確認裝置支援 WebGL，再重新點分頁。'); }
+  }
   if (tab === '2d') draw2D();
 }
 
@@ -394,4 +410,4 @@ window.addEventListener('resize', () => { clearTimeout(resizeT); resizeT = setTi
 
 syncControls();
 // 測試用
-window.__pb = { state, get mosaic() { return mosaic; }, setSource, sampleImage, buildPrint };
+window.__pb = { state, get figure() { return figureApp?.inspectFigure(); }, get mosaic() { return mosaic; }, setSource, sampleImage, buildPrint };
