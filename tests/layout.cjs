@@ -1,0 +1,15 @@
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');const assert=require('assert/strict');
+(async()=>{const browser=await chromium.launch({headless:true,...(process.env.BROWSER_EXE?{executablePath:process.env.BROWSER_EXE}:{})});try{const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.route('**/detector.tflite',r=>r.abort());await page.goto('http://localhost:5180');await page.locator('#btnSample').click();await page.waitForFunction(()=>__pb.figure&&!__pb.figure.working,{timeout:90000});
+await page.evaluate(()=>{document.querySelector('#figureStatus').textContent='插畫分割不完整，已依人物區域近似取色，請再確認髮型與上衣。照片沒有完整下半身，已先用黑色長褲；也可以改成裙子或短褲。';document.querySelector('#figureAR').hidden=false;});
+for(const [width,height]of [[1440,900],[1366,768],[1280,720],[1024,768],[768,1024],[390,844],[1024,600]]){
+ await page.setViewportSize({width,height});const issues=[];
+ for(const section of ['photo','clothes','head','props','colors','export']){
+  await page.locator(`[data-figure-section-button="${section}"]`).click();
+  if(section==='props')await page.locator('[data-look="glasses"]').check();
+  const result=await page.evaluate(()=>{const body=document.querySelector('.figure-section-body').getBoundingClientRect(),status=document.querySelector('#figureStatus').getBoundingClientRect();const bad=[];for(const e of document.querySelectorAll('#figurePanel button,#figurePanel select,#figurePanel input:not([type=file]),#thumb')){const r=e.getBoundingClientRect();if(!r.width||!r.height)continue;if(r.bottom>innerHeight-3||r.right>innerWidth||r.top<0)bad.push([e.id||e.dataset.look||e.textContent.trim(),Math.round(r.bottom)]);if(e.closest('[data-figure-section]')&&r.bottom>status.top-2)bad.push(['內容重疊狀態列',e.id||e.dataset.look||e.textContent.trim(),Math.round(r.bottom),Math.round(status.top)]);}return {bad,scroll:document.documentElement.scrollHeight,viewport:innerHeight,stage:document.querySelector('#stage').getBoundingClientRect().height};});
+  if(result.bad.length)issues.push({section,...result});if(result.scroll!==height)issues.push({section,overflow:result.scroll-height});
+ }
+ console.log(width,height,JSON.stringify(issues));assert.deepEqual(issues,[]);await page.locator('[data-figure-section-button="clothes"]').click();await page.screenshot({path:`tests/layout-${width}.png`});
+}
+await page.locator('[data-figure-section-button="clothes"]').click();await page.locator('[data-pick="top"]').click();assert(await page.locator('#figureSection-photo').isVisible());await page.locator('#thumb').click({position:{x:10,y:10}});assert(await page.locator('#figureSection-clothes').isVisible());await page.locator('[data-tab="2d"]').click();assert.equal(await page.locator('.panel > #srcCard').count(),1);await page.locator('[data-tab="figure"]').click();assert.equal(await page.locator('#figurePhotoSlot > #srcCard').count(),1);assert.deepEqual(errors,[]);console.log('吸色往返與原分頁照片歸位：通過');
+}finally{await browser.close();}})().catch(e=>{console.error(e);process.exitCode=1;});
